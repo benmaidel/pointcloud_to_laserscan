@@ -51,7 +51,7 @@
 
 namespace pointcloud_to_laserscan
 {
-  void scan_outlier_removal_filter(sensor_msgs::LaserScan &scan, double cluster_break_distance, int max_noise_cluster_size, double max_noise_cluster_distance);
+  void scan_outlier_removal_filter(sensor_msgs::LaserScan &scan, double cluster_break_distance_, int max_noise_cluster_size_, double max_noise_cluster_distance_);
 
   IpaPointCloudToLaserScanNodelet::IpaPointCloudToLaserScanNodelet() {}
 
@@ -75,6 +75,12 @@ namespace pointcloud_to_laserscan
     int concurrency_level;
     private_nh_.param<int>("concurrency_level", concurrency_level, 1);
     private_nh_.param<bool>("use_inf", use_inf_, true);
+
+    // Get outlier filter related params
+    private_nh_.param<bool>("use_outlier_filter", use_outlier_filter_, false);
+    private_nh_.param<double>("max_noise_cluster_distance", max_noise_cluster_distance_, 2.0);
+    private_nh_.param<double>("cluster_break_distance", cluster_break_distance_, 0.3);
+    private_nh_.param<int>("max_noise_cluster_size", max_noise_cluster_size_, 5);
 
     //Check if explicitly single threaded, otherwise, let nodelet manager dictate thread pool size
     if (concurrency_level == 1)
@@ -144,16 +150,6 @@ namespace pointcloud_to_laserscan
 
   void IpaPointCloudToLaserScanNodelet::cloudCb(const sensor_msgs::PointCloud2ConstPtr &cloud_msg)
   {
-    // Get filter related parameters
-    bool use_outlier_filter;
-    double max_noise_cluster_distance;
-    double cluster_break_distance;
-    int max_noise_cluster_size;
-    private_nh_.param<bool>("use_outlier_filter", use_outlier_filter, false);
-    private_nh_.param<double>("max_noise_cluster_distance", max_noise_cluster_distance, 2.0);
-    private_nh_.param<double>("cluster_break_distance", cluster_break_distance, 0.3);
-    private_nh_.param<int>("max_noise_cluster_size", max_noise_cluster_size, 5);
-
     // convert const ptr to ptr to support downsampling
     sensor_msgs::PointCloud2Ptr cloud(boost::const_pointer_cast<sensor_msgs::PointCloud2>(cloud_msg));
 
@@ -307,9 +303,9 @@ namespace pointcloud_to_laserscan
 
     }
 
-    if(use_outlier_filter)
+    if(use_outlier_filter_)
     {
-        scan_outlier_removal_filter(output, cluster_break_distance, max_noise_cluster_size, max_noise_cluster_distance);
+        scan_outlier_removal_filter(output, cluster_break_distance_, max_noise_cluster_size_, max_noise_cluster_distance_);
     }
 
     pub_.publish(output);
@@ -317,18 +313,18 @@ namespace pointcloud_to_laserscan
 
   /**
    * @brief scan_outlier_removal_filter
-   * Remove clusters that are small enough (specified by parameter max_noise_cluster_size) and
+   * Remove clusters that are small enough (specified by parameter max_noise_cluster_size_) and
    * closer to the sensor (has smaller range) than the surrounding clusters.
-   * A cluster is defined as a collection of point with a specified range jump (specified by parameter cluster_break_distance) to neigboring points.
+   * A cluster is defined as a collection of point with a specified range jump (specified by parameter cluster_break_distance_) to neigboring points.
    * The "closer to the sensor" is determined by the sign of the range jump at the beginning and end of the cluster.
    *
    * The implementation assumes ordered scan, meaning that the points are sorted according to the angle.
    *
    * @param scan The 2d sensor msgs laser scan
-   * @param cluster_break_distance The range jump to cause a cluster separation
-   * @param max_noise_cluster_size The maximum number of points a cluster can contain in order to be seen as noise and thereby removed
+   * @param cluster_break_distance_ The range jump to cause a cluster separation
+   * @param max_noise_cluster_size_ The maximum number of points a cluster can contain in order to be seen as noise and thereby removed
    */
-  void scan_outlier_removal_filter(sensor_msgs::LaserScan &scan, double cluster_break_distance, int max_noise_cluster_size, double max_noise_cluster_distance)
+  void scan_outlier_removal_filter(sensor_msgs::LaserScan &scan, double cluster_break_distance_, int max_noise_cluster_size_, double max_noise_cluster_distance_)
   {
       // help function initialization
       int ranges_size = scan.ranges.size();
@@ -351,18 +347,18 @@ namespace pointcloud_to_laserscan
           i_current_cluster ++;
 
           // check if last point in cluster; find diff larger than border -> cluster separation
-          if (diffs[i] > cluster_break_distance || diffs[i] < -cluster_break_distance)
+          if (diffs[i] > cluster_break_distance_ || diffs[i] < -cluster_break_distance_)
           {
               bool new_cluster_further_away = (diffs[i] > 0);
 
               // Only remove cluster if it is closer than surrounding clusters
-              if ((i_current_cluster < max_noise_cluster_size) && (new_cluster_further_away != cluster_further_away))
+              if ((i_current_cluster < max_noise_cluster_size_) && (new_cluster_further_away != cluster_further_away))
               {
                   // check if all cluster points are closer than the max noise distance
                   bool is_noise_cluster = true;
                   for (int k = 0; k < i_current_cluster; k++)
                   {
-                      if (scan.ranges[cluster_indecies[k]] > max_noise_cluster_distance)
+                      if (scan.ranges[cluster_indecies[k]] > max_noise_cluster_distance_)
                       {
                           is_noise_cluster = false;
                           break;
@@ -374,7 +370,7 @@ namespace pointcloud_to_laserscan
                   {
                       for (int k = 0; k < i_current_cluster; k++)
                       {
-                          if (scan.ranges[cluster_indecies[k]] < max_noise_cluster_distance)
+                          if (scan.ranges[cluster_indecies[k]] < max_noise_cluster_distance_)
                               scan.ranges[cluster_indecies[k]] = scan.range_max;
                       }
                   }
@@ -389,7 +385,7 @@ namespace pointcloud_to_laserscan
 
 
       // remove last cluster if small enough
-      if ((i_current_cluster < cluster_break_distance) && !cluster_further_away)
+      if ((i_current_cluster < cluster_break_distance_) && !cluster_further_away)
       {
           for (int k = 0; k < i_current_cluster; k++)
           {

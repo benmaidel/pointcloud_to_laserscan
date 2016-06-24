@@ -92,6 +92,11 @@ namespace pointcloud_to_laserscan
     double tolerance_;
     double min_height_, max_height_, angle_min_, angle_max_, angle_increment_, scan_time_, range_min_, range_max_;
     bool use_inf_;
+    // filter related parameters
+    bool use_outlier_filter_;
+    double max_noise_cluster_distance_;
+    double cluster_break_distance_;
+    int max_noise_cluster_size_;
   };
 
 }  // pointcloud_to_laserscan
