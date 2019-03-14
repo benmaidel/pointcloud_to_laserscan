@@ -2,8 +2,8 @@
 Changelog for package pointcloud_to_laserscan
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.3.1 (2019-03-14)
+------------------
 * Merge pull request `#12 <https://github.com/ipa320/pointcloud_to_laserscan/issues/12>`_ from ipa-fxm/review_frame_publisher
   review frame publisher
 * frame_publisher tf2 migration
